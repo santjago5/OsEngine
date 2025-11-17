@@ -18,7 +18,7 @@ using System.Text;
 using System.Threading;
 using OsEngine.Entity.WebSocketOsEngine;
 using RestSharp;
-using OsEngine.Market.Servers.XT.XTFutures.Entity;
+
 
 namespace OsEngine.Market.Servers.XT.XTSpot
 {
@@ -32,6 +32,9 @@ namespace OsEngine.Market.Servers.XT.XTSpot
 
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterSecretKey, "");
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
         }
 
         public class XTServerSpotRealization : IServerRealization
@@ -160,6 +163,8 @@ namespace OsEngine.Market.Servers.XT.XTSpot
             public event Action ConnectEvent;
 
             public event Action DisconnectEvent;
+
+            public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
             #endregion
 

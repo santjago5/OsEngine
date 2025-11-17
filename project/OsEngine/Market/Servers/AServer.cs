@@ -47,6 +47,11 @@ namespace OsEngine.Market.Servers
                     File.Delete(@"Engine\" + ServerNameUnique + @"ServerSettings.txt");
                 }
 
+                if (File.Exists(@"Engine\" + ServerNameUnique + @"nonTradePeriod.txt"))
+                {
+                    File.Delete(@"Engine\" + ServerNameUnique + @"nonTradePeriod.txt");
+                }
+
                 ServerRealization.Dispose();
             }
             catch
@@ -75,6 +80,7 @@ namespace OsEngine.Market.Servers
                 _serverRealization.PortfolioEvent += _serverRealization_PortfolioEvent;
                 _serverRealization.SecurityEvent += _serverRealization_SecurityEvent;
                 _serverRealization.LogMessageEvent += SendLogMessage;
+                _serverRealization.ForceCheckOrdersAfterReconnectEvent += _serverRealization_ForceCheckOrdersAfterReconnect;
 
                 _serverRealization.NewsEvent += _serverRealization_NewsEvent;
 
@@ -126,7 +132,11 @@ namespace OsEngine.Market.Servers
 
                 CreateParameterButton(OsLocalization.Market.ServerParam12);
                 ServerParameters[9].Comment = OsLocalization.Market.Label131;
-                ((ServerParameterButton)ServerParameters[9]).UserClickButton += AServer_UserClickButton;
+                ((ServerParameterButton)ServerParameters[9]).UserClickButton += AServer_UserClickSecuritiesUiButton;
+
+                CreateParameterButton(OsLocalization.Market.ServerParam14);
+                ServerParameters[10].Comment = OsLocalization.Market.Label281;
+                ((ServerParameterButton)ServerParameters[10]).UserClickButton += AServer_UserClickNonTradePeriodsUiButton;
 
                 if (ServerPermission != null
                     && ServerPermission.IsSupports_ProxyFor_MultipleInstances)
@@ -205,6 +215,8 @@ namespace OsEngine.Market.Servers
                 _ordersHub.ActiveStateOrderCheckStatusEvent += _ordersHub_ActiveStateOrderCheckStatusEvent;
                 _ordersHub.LostOrderEvent += _ordersHub_LostOrderEvent;
                 _ordersHub.LostMyTradesEvent += _ordersHub_LostMyTradesEvent;
+
+                _nonTradePeriods = new NonTradePeriods(ServerNameUnique);
 
                 ComparePositionsModule = new ComparePositionsModule(this);
                 ComparePositionsModule.LogMessageEvent += SendLogMessage;
@@ -1120,6 +1132,8 @@ namespace OsEngine.Market.Servers
                         ServerRealization.GetSecurities();
                     }
 
+                    GetNonTradePeriod();
+
                     if (_lastDateTimeServer.Date != DateTime.Now.Date)
                     {
                         HasConnectionMessageBeenSent = false;
@@ -1352,6 +1366,8 @@ namespace OsEngine.Market.Servers
 
                             for (int i = 0; i < list.Count; i++)
                             {
+                                if (_isNonTradingPeriodNow) break;
+
                                 if (_needToCheckDataFeedOnDisconnect != null
                                     && _needToCheckDataFeedOnDisconnect.Value)
                                 {
@@ -1368,7 +1384,6 @@ namespace OsEngine.Market.Servers
                             }
 
                             if (_needToRemoveTradesFromMemory.Value == true && _allTrades != null)
-
                             {
                                 for (int i = 0; i < _allTrades.Length; i++)
                                 {
@@ -1393,18 +1408,21 @@ namespace OsEngine.Market.Servers
                         {
                             if (_marketDepthsToSend.Count < 1000)
                             {
-                                if (NewMarketDepthEvent != null)
+                                if (!_isNonTradingPeriodNow)
                                 {
-                                    NewMarketDepthEvent(depth);
-                                }
+                                    if (NewMarketDepthEvent != null)
+                                    {
+                                        NewMarketDepthEvent(depth);
+                                    }
 
-                                if (_needToCheckDataFeedOnDisconnect != null
-                                    && _needToCheckDataFeedOnDisconnect.Value)
-                                {
-                                    SecurityFlowTime tradeTime = new SecurityFlowTime();
-                                    tradeTime.SecurityName = depth.SecurityNameCode;
-                                    tradeTime.LastTimeMarketDepth = DateTime.Now;
-                                    _securitiesFeedFlow.Enqueue(tradeTime);
+                                    if (_needToCheckDataFeedOnDisconnect != null
+                                        && _needToCheckDataFeedOnDisconnect.Value)
+                                    {
+                                        SecurityFlowTime tradeTime = new SecurityFlowTime();
+                                        tradeTime.SecurityName = depth.SecurityNameCode;
+                                        tradeTime.LastTimeMarketDepth = DateTime.Now;
+                                        _securitiesFeedFlow.Enqueue(tradeTime);
+                                    }
                                 }
                             }
                             else
@@ -1439,6 +1457,8 @@ namespace OsEngine.Market.Servers
 
                                 for (int i = 0; i < list.Count; i++)
                                 {
+                                    if (_isNonTradingPeriodNow) break;
+
                                     if (_needToCheckDataFeedOnDisconnect != null
                                     && _needToCheckDataFeedOnDisconnect.Value)
                                     {
@@ -1468,7 +1488,7 @@ namespace OsEngine.Market.Servers
                         {
                             if (_bidAskToSend.Count < 1000)
                             {
-                                if (NewBidAskIncomeEvent != null)
+                                if (!_isNonTradingPeriodNow && NewBidAskIncomeEvent != null)
                                 {
                                     NewBidAskIncomeEvent(bidAsk.Bid, bidAsk.Ask, bidAsk.Security);
                                 }
@@ -1504,6 +1524,8 @@ namespace OsEngine.Market.Servers
 
                                 for (int i = 0; i < list.Count; i++)
                                 {
+                                    if (_isNonTradingPeriodNow) break;
+
                                     if (NewBidAskIncomeEvent != null)
                                     {
                                         NewBidAskIncomeEvent(list[i].Bid, list[i].Ask, list[i].Security);
@@ -2110,7 +2132,8 @@ namespace OsEngine.Market.Servers
                         sec.Strike = securities[i].Strike;
                         sec.State = securities[i].State;
                         sec.Expiration = securities[i].Expiration;
-                        sec.Go = securities[i].Go;
+                        sec.MarginBuy = securities[i].MarginBuy;
+                        sec.MarginSell = securities[i].MarginSell;
                         sec.MinTradeAmount = securities[i].MinTradeAmount;
                         sec.PriceLimitHigh = securities[i].PriceLimitHigh;
                         sec.PriceLimitLow = securities[i].PriceLimitLow;
@@ -2132,7 +2155,7 @@ namespace OsEngine.Market.Servers
 
         private SecuritiesUi _securitiesUi;
 
-        private void AServer_UserClickButton()
+        private void AServer_UserClickSecuritiesUiButton()
         {
             if (_securitiesUi == null)
             {
@@ -2184,7 +2207,7 @@ namespace OsEngine.Market.Servers
                             securities[j].VolumeStep = curSaveSec.VolumeStep;
                             securities[j].PriceLimitHigh = curSaveSec.PriceLimitHigh;
                             securities[j].PriceLimitLow = curSaveSec.PriceLimitLow;
-                            securities[j].Go = curSaveSec.Go;
+                            securities[j].MarginBuy = curSaveSec.MarginBuy;
                             securities[j].Strike = curSaveSec.Strike;
 
                             break;
@@ -2301,20 +2324,22 @@ namespace OsEngine.Market.Servers
 
                     for (int i = 0; _securities != null && i < _securities.Count; i++)
                     {
-                        if (_securities[i] == null)
+                        Security securityCurrent = _securities[i];
+
+                        if (securityCurrent == null)
                         {
                             continue;
                         }
-                        if (_securities[i].Name == securityName &&
-                            (_securities[i].NameClass == securityClass))
+                        if (securityCurrent.Name == securityName &&
+                            (securityCurrent.NameClass == securityClass))
                         {
-                            security = _securities[i];
+                            security = securityCurrent;
                             break;
                         }
-                        if (_securities[i].Name == securityName &&
+                        if (securityCurrent.Name == securityName &&
                             (securityClass == null))
                         {
-                            security = _securities[i];
+                            security = securityCurrent;
                             break;
                         }
                     }
@@ -2404,7 +2429,62 @@ namespace OsEngine.Market.Servers
                 if (_needToSaveCandlesParam.Value == true)
                 {
                     List<Candle> candlesStorage = _candleStorage.GetCandles(series.Specification, _needToLoadCandlesCountParam.Value);
-                    series.CandlesAll = series.CandlesAll.Merge(candlesStorage);
+
+                    if(series.TimeFrameBuilder.CandleMarketDataType == CandleMarketDataType.MarketDepth)
+                    {
+                        // нужно вставками прогружать каждую свечу по отдельности. 
+                        series.CandlesAll = series.CandlesAll.Merge(candlesStorage);
+
+                        for(int i = 0; candlesStorage != null && i < candlesStorage.Count;i++)
+                        {
+                            Candle candle = candlesStorage[i];
+
+                            bool isInArray = false;
+
+                            for(int j = 0;j < series.CandlesAll.Count;j++)
+                            {
+                                if (series.CandlesAll[j].TimeStart == candle.TimeStart)
+                                {
+                                    series.CandlesAll[j] = candle;
+                                    isInArray = true;
+                                    break;
+                                }
+                                else if (j == 0
+                                   && candle.TimeStart < series.CandlesAll[j].TimeStart)
+                                {
+                                    series.CandlesAll.Insert(j, candle);
+                                    isInArray = true;
+                                    break;
+                                }
+                                else if (j != 0
+                                    && candle.TimeStart > series.CandlesAll[j-1].TimeStart
+                                    && candle.TimeStart < series.CandlesAll[j].TimeStart)
+                                {
+                                    series.CandlesAll.Insert(j, candle);
+                                    isInArray = true;
+                                    break;
+                                }
+                            }
+
+                            if(isInArray == false)
+                            {
+                                series.CandlesAll.Add(candle);
+                            }
+                        }
+
+                        if(series.CandlesAll.Count > _needToLoadCandlesCountParam.Value)
+                        {
+                            series.CandlesAll = 
+                                series.CandlesAll.GetRange(
+                                    series.CandlesAll.Count - _needToLoadCandlesCountParam.Value, 
+                                    _needToLoadCandlesCountParam.Value);
+                        }
+
+                    }
+                    else
+                    {
+                        series.CandlesAll = series.CandlesAll.Merge(candlesStorage);
+                    }
 
                     List<Candle> candlesAll = series.CandlesAll;
 
@@ -2978,11 +3058,6 @@ namespace OsEngine.Market.Servers
                     myDepth.Bids.Count == 0))
                 {
                     return;
-                }
-
-                if (myDepth.SecurityNameCode == "LQDT")
-                {
-
                 }
 
                 TrySendMarketDepthEvent(myDepth);
@@ -3984,6 +4059,18 @@ namespace OsEngine.Market.Servers
             }
         }
 
+        private void _serverRealization_ForceCheckOrdersAfterReconnect()
+        {
+            try
+            {
+                _ordersHub.ForceCheckOrdersAfterReconnect();
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
         #endregion
 
         #region Orders private data interface 
@@ -4393,6 +4480,54 @@ namespace OsEngine.Market.Servers
             catch
             {
                 // игнор
+            }
+        }
+
+        #endregion
+
+        #region Non trade periods
+
+        private NonTradePeriods _nonTradePeriods;
+
+        private bool _isNonTradingPeriodNow;
+
+        private void AServer_UserClickNonTradePeriodsUiButton()
+        {
+            if (_nonTradePeriods != null)
+            {
+                _nonTradePeriods.ShowDialog();
+            }
+        }
+
+        private void GetNonTradePeriod()
+        {
+            try
+            {
+                if (_nonTradePeriods == null)
+                {
+                    return;
+                }
+
+                if (!_nonTradePeriods.CanTradeThisTime(DateTime.Now))
+                {
+                    _isNonTradingPeriodNow = true;
+                }
+                else
+                {
+                    _isNonTradingPeriodNow = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                SendLogMessage(ex.ToString(), LogMessageType.Error);
+            }
+        }
+
+        public bool IsNonTradePeriod
+        {
+            get 
+            {
+                return _isNonTradingPeriodNow; 
             }
         }
 

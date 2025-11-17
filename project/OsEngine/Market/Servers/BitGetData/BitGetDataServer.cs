@@ -101,7 +101,10 @@ namespace OsEngine.Market.Servers.BitGetData
         public ServerConnectStatus ServerStatus { get; set; }
 
         public event Action ConnectEvent;
+
         public event Action DisconnectEvent;
+
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
         #endregion
 
@@ -873,14 +876,14 @@ namespace OsEngine.Market.Servers.BitGetData
 
         public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount) { return null; }
 
-        public event Action<News> NewsEvent;
-        public event Action<MarketDepth> MarketDepthEvent;
-        public event Action<Trade> NewTradesEvent;
-        public event Action<Order> MyOrderEvent;
-        public event Action<MyTrade> MyTradeEvent;
-        public event Action<OptionMarketDataForConnector> AdditionalMarketDataEvent;
-        public event Action<Funding> FundingUpdateEvent;
-        public event Action<SecurityVolumes> Volume24hUpdateEvent;
+        public event Action<News> NewsEvent { add { } remove { } }
+        public event Action<MarketDepth> MarketDepthEvent { add { } remove { } }
+        public event Action<Trade> NewTradesEvent { add { } remove { } }
+        public event Action<Order> MyOrderEvent { add { } remove { } }
+        public event Action<MyTrade> MyTradeEvent { add { } remove { } }
+        public event Action<OptionMarketDataForConnector> AdditionalMarketDataEvent { add { } remove { } }
+        public event Action<Funding> FundingUpdateEvent { add { } remove { } }
+        public event Action<SecurityVolumes> Volume24hUpdateEvent { add { } remove { } }
 
         #endregion
     }

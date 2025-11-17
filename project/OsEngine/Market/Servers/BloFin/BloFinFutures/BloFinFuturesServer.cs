@@ -33,8 +33,20 @@ namespace OsEngine.Market.Servers.BloFin
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterSecretKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParamPassword, "");
-            CreateParameterEnum("Hedge Mode", "On", new List<string> { "On", "Off" });
+            CreateParameterBoolean("Hedge Mode", true);
+            ServerParameters[3].ValueChange += BloFinFuturesServer_ValueChange;
             CreateParameterEnum("Margin Mode", "Cross", new List<string> { "Cross", "Isolated" });
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
+            ServerParameters[2].Comment = OsLocalization.Market.Label271;
+            ServerParameters[3].Comment = OsLocalization.Market.Label250;
+            ServerParameters[4].Comment = OsLocalization.Market.Label249;
+        }
+
+        private void BloFinFuturesServer_ValueChange()
+        {
+            ((BloFinFuturesServerRealization)ServerRealization).HedgeMode = ((ServerParameterBool)ServerParameters[3]).Value;
         }
     }
 
@@ -68,15 +80,16 @@ namespace OsEngine.Market.Servers.BloFin
             {
                 _publicKey = ((ServerParameterString)ServerParameters[0]).Value;
                 _secretKey = ((ServerParameterPassword)ServerParameters[1]).Value;
-                _password = ((ServerParameterPassword)ServerParameters[2]).Value;
+                _passphrase = ((ServerParameterPassword)ServerParameters[2]).Value;
+                HedgeMode = ((ServerParameterBool)ServerParameters[3]).Value;
 
-                if (((ServerParameterEnum)ServerParameters[3]).Value == "On")
+                if (string.IsNullOrEmpty(_publicKey) ||
+                    string.IsNullOrEmpty(_secretKey) ||
+                    string.IsNullOrEmpty(_passphrase))
                 {
-                    _hedgeMode = true;
-                }
-                else
-                {
-                    _hedgeMode = false;
+                    SendLogMessage("Can`t run BloFinFutures connector. No keys or passphrase",
+                        LogMessageType.Error);
+                    return;
                 }
 
                 if (((ServerParameterEnum)ServerParameters[4]).Value == "Cross")
@@ -97,7 +110,7 @@ namespace OsEngine.Market.Servers.BloFin
                 CreateWebSocketConnection();
                 CheckActivationSockets();
                 SetMarginMode();
-                SetPositionMode();
+                //SetPositionMode();
             }
             catch (Exception ex)
             {
@@ -173,9 +186,14 @@ namespace OsEngine.Market.Servers.BloFin
 
         private void SetPositionMode()
         {
+            _rateGate.WaitToProceed();
+
             try
             {
-                _rateGate.WaitToProceed();
+                if (ServerStatus == ServerConnectStatus.Disconnect)
+                {
+                    return;
+                }
 
                 Dictionary<string, string> mode = new Dictionary<string, string>();
                 mode["positionMode"] = "net_mode";
@@ -223,6 +241,8 @@ namespace OsEngine.Market.Servers.BloFin
 
         public event Action DisconnectEvent;
 
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
         #endregion 1
 
         #region 2 Properties
@@ -233,7 +253,7 @@ namespace OsEngine.Market.Servers.BloFin
 
         private string _secretKey;
 
-        private string _password;
+        private string _passphrase;
 
         private string _baseUrl = "https://openapi.blofin.com";
 
@@ -249,6 +269,21 @@ namespace OsEngine.Market.Servers.BloFin
 
         private bool _hedgeMode;
 
+        public bool HedgeMode
+        {
+            get { return _hedgeMode; }
+            set
+            {
+                if (value == _hedgeMode)
+                {
+                    return;
+                }
+                _hedgeMode = value;
+
+                SetPositionMode();
+            }
+        }
+
         private string _marginMode;
 
         private RateGate _rateGate = new RateGate(1, TimeSpan.FromMilliseconds(210));
@@ -257,8 +292,15 @@ namespace OsEngine.Market.Servers.BloFin
 
         #region 3 Securities
 
+        private List<Security> _securities = new List<Security>();
+
         public void GetSecurities()
         {
+            if (_securities == null)
+            {
+                _securities = new List<Security>();
+            }
+
             try
             {
                 _rateGate.WaitToProceed();
@@ -278,8 +320,6 @@ namespace OsEngine.Market.Servers.BloFin
                             return;
                         }
 
-                        List<Security> securities = new List<Security>();
-
                         for (int i = 0; i < symbols.data.Count; i++)
                         {
                             RestMessageInstruments item = symbols.data[i];
@@ -287,25 +327,25 @@ namespace OsEngine.Market.Servers.BloFin
                             Security newSecurity = new Security();
 
                             newSecurity.Exchange = ServerType.BloFinFutures.ToString();
-                            newSecurity.Lot = item.minSize.ToDecimal() * item.contractValue.ToDecimal();
+                            newSecurity.Lot = 1;
                             newSecurity.Name = item.instId;
                             newSecurity.NameFull = item.instId;
                             newSecurity.NameClass = item.quoteCurrency;
-                            newSecurity.NameId = item.instId;
+                            newSecurity.NameId = item.instId + "_" + item.contractValue;
                             newSecurity.SecurityType = SecurityType.Futures;
                             newSecurity.Decimals = item.tickSize.DecimalsCount(); ;
                             newSecurity.PriceStep = item.tickSize.ToDecimal();
                             newSecurity.PriceStepCost = newSecurity.PriceStep;
                             newSecurity.State = SecurityStateType.Activ;
                             newSecurity.MinTradeAmountType = MinTradeAmountType.Contract;
-                            newSecurity.MinTradeAmount = item.minSize.ToDecimal();
+                            newSecurity.MinTradeAmount = item.minSize.ToDecimal() * item.contractValue.ToDecimal();
                             newSecurity.DecimalsVolume = (item.minSize.ToDecimal() * item.contractValue.ToDecimal()).ToString().DecimalsCount();
                             newSecurity.VolumeStep = item.minSize.ToDecimal();
 
-                            securities.Add(newSecurity);
+                            _securities.Add(newSecurity);
                         }
 
-                        SecurityEvent(securities);
+                        SecurityEvent(_securities);
                     }
                     else
                     {
@@ -653,6 +693,8 @@ namespace OsEngine.Market.Servers.BloFin
                     {
                         ConnectEvent();
                     }
+
+                    SetPositionMode();
                 }
             }
         }
@@ -705,7 +747,7 @@ namespace OsEngine.Market.Servers.BloFin
                 string nonce = Guid.NewGuid().ToString();
                 string signature = GenerateSignature(timestamp, Method.GET.ToString(), path, null, nonce);
 
-                _webSocketPrivate?.SendAsync($"{{\"op\":\"login\",\"args\":[{{\"apiKey\":\"{_publicKey}\",\"passphrase\":\"{_password}\",\"timestamp\":\"{timestamp}\",\"sign\":\"{signature}\",\"nonce\":\"{nonce}\"}}]}}");
+                _webSocketPrivate?.SendAsync($"{{\"op\":\"login\",\"args\":[{{\"apiKey\":\"{_publicKey}\",\"passphrase\":\"{_passphrase}\",\"timestamp\":\"{timestamp}\",\"sign\":\"{signature}\",\"nonce\":\"{nonce}\"}}]}}");
             }
             catch (Exception ex)
             {
@@ -1406,7 +1448,7 @@ namespace OsEngine.Market.Servers.BloFin
 
             newOrder.NumberMarket = item.orderId.ToString();
             newOrder.Side = item.side.Equals("buy") ? Side.Buy : Side.Sell;
-            newOrder.Volume = item.size.ToDecimal();
+            newOrder.Volume = item.size.ToDecimal() * GetVolume(newOrder.SecurityNameCode);
             newOrder.PortfolioNumber = "BloFinFutures";
             newOrder.Price = item.price.ToDecimal();
 
@@ -1469,7 +1511,7 @@ namespace OsEngine.Market.Servers.BloFin
                             pos.SecurityNameCode = item.instId;
                         }
 
-                        pos.ValueCurrent = Math.Round(item.positions.ToDecimal(), 5);
+                        pos.ValueCurrent = Math.Round(item.positions.ToDecimal() * GetVolume(item.instId), 5);
                         pos.ValueBlocked = 0;
                         pos.UnrealizedPnl = Math.Round(item.unrealizedPnl.ToDecimal(), 5);
 
@@ -1629,6 +1671,10 @@ namespace OsEngine.Market.Servers.BloFin
 
         public event Action<MyTrade> MyTradeEvent;
 
+        public event Action<Funding> FundingUpdateEvent { add { } remove { } }
+
+        public event Action<SecurityVolumes> Volume24hUpdateEvent { add { } remove { } }
+
         public event Action<OptionMarketDataForConnector> AdditionalMarketDataEvent { add { } remove { } }
 
         #endregion 10
@@ -1655,6 +1701,8 @@ namespace OsEngine.Market.Servers.BloFin
                     }
                 }
 
+                decimal volume = order.Volume / GetVolume(order.SecurityNameCode);
+
                 Dictionary<string, string> orderRequest = new Dictionary<string, string>();
 
                 orderRequest.Add("instId", order.SecurityNameCode);
@@ -1663,7 +1711,7 @@ namespace OsEngine.Market.Servers.BloFin
                 orderRequest.Add("side", order.Side == Side.Buy ? "buy" : "sell");
                 orderRequest.Add("orderType", order.TypeOrder.ToString().ToLower());
                 orderRequest.Add("price", order.Price.ToString().Replace(",", "."));
-                orderRequest.Add("size", order.Volume.ToString().Replace(",", "."));
+                orderRequest.Add("size", volume.ToString().Replace(",", "."));
                 orderRequest.Add("clientOrderId", order.NumberUser.ToString());
                 orderRequest.Add("brokerId", "0f43c3141c50b7e3");
 
@@ -1707,6 +1755,26 @@ namespace OsEngine.Market.Servers.BloFin
             {
                 SendLogMessage($"Send Order - {ex.Message}, {ex.StackTrace}", LogMessageType.Error);
             }
+        }
+
+        private decimal GetVolume(string securityName)
+        {
+            decimal minVolume = 1;
+
+            for (int i = 0; i < _securities.Count; i++)
+            {
+                if (_securities[i].Name == securityName)
+                {
+                    minVolume = _securities[i].NameId.Split('_')[1].ToDecimal();
+                }
+            }
+
+            if (minVolume <= 0)
+            {
+                return 1;
+            }
+
+            return minVolume;
         }
 
         private void CreateOrderFail(Order order)
@@ -1847,7 +1915,7 @@ namespace OsEngine.Market.Servers.BloFin
 
                 string path = $"/api/v1/trade/orders-pending";
 
-                IRestResponse response = CreatePrivateQuery(path, Method.GET, null);
+                IRestResponse response = CreatePrivateQuery(path, Method.GET);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -1871,7 +1939,7 @@ namespace OsEngine.Market.Servers.BloFin
                             newOrder.NumberMarket = item.orderId.ToString();
                             newOrder.Side = item.side == "buy" ? Side.Buy : Side.Sell;
                             newOrder.State = stateType;
-                            newOrder.Volume = item.size.ToDecimal();
+                            newOrder.Volume = item.size.ToDecimal() * GetVolume(newOrder.SecurityNameCode);
                             newOrder.Price = item.price.ToDecimal();
                             newOrder.ServerType = ServerType.BloFinFutures;
                             newOrder.PortfolioNumber = "BloFinFutures";
@@ -1967,7 +2035,7 @@ namespace OsEngine.Market.Servers.BloFin
                 string path = $"/api/v1/trade/orders-history";
                 string requestStr = $"{path}?instId={securityName}&stater=filled";
 
-                IRestResponse response = CreatePrivateQuery(requestStr, Method.GET, null);
+                IRestResponse response = CreatePrivateQuery(requestStr, Method.GET);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -1991,7 +2059,7 @@ namespace OsEngine.Market.Servers.BloFin
                             newOrder.NumberMarket = item.orderId.ToString();
                             newOrder.Side = item.side == "buy" ? Side.Buy : Side.Sell;
                             newOrder.State = stateType;
-                            newOrder.Volume = item.size.ToDecimal();
+                            newOrder.Volume = item.size.ToDecimal() * GetVolume(newOrder.SecurityNameCode);
                             newOrder.Price = item.price.ToDecimal();
                             newOrder.ServerType = ServerType.BloFinFutures;
                             newOrder.PortfolioNumber = "BloFinFutures";
@@ -2030,7 +2098,7 @@ namespace OsEngine.Market.Servers.BloFin
                 string path = $"/api/v1/trade/fills-history";
                 string requestStr = $"{path}?instId={securityName}&orderId={numberMarket}";
 
-                IRestResponse response = CreatePrivateQuery(requestStr, Method.GET, null);
+                IRestResponse response = CreatePrivateQuery(requestStr, Method.GET);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -2055,7 +2123,7 @@ namespace OsEngine.Market.Servers.BloFin
                             newTrade.Price = item.fillPrice.ToDecimal();
                             newTrade.NumberTrade = item.tradeId;
                             newTrade.Side = item.side.Equals("buy") ? Side.Buy : Side.Sell;
-                            newTrade.Volume = item.fillSize.ToDecimal();
+                            newTrade.Volume = item.fillSize.ToDecimal() * GetVolume(item.instId);
 
                             MyTradeEvent(newTrade);
                         }
@@ -2090,7 +2158,7 @@ namespace OsEngine.Market.Servers.BloFin
 
         #region 12 Query
 
-        private IRestResponse CreatePrivateQuery(string path, Method method, string body)
+        private IRestResponse CreatePrivateQuery(string path, Method method, string body = "")
         {
             try
             {
@@ -2104,12 +2172,8 @@ namespace OsEngine.Market.Servers.BloFin
                 requestRest.AddHeader("ACCESS-SIGN", signature);
                 requestRest.AddHeader("ACCESS-TIMESTAMP", timestamp);
                 requestRest.AddHeader("ACCESS-NONCE", nonce);
-                requestRest.AddHeader("ACCESS-PASSPHRASE", _password);
-
-                if (body != null)
-                {
-                    requestRest.AddParameter("application/json", body, ParameterType.RequestBody);
-                }
+                requestRest.AddHeader("ACCESS-PASSPHRASE", _passphrase);
+                requestRest.AddParameter("application/json", body, ParameterType.RequestBody);
 
                 IRestResponse response = new RestClient(_baseUrl).Execute(requestRest);
 
@@ -2130,7 +2194,7 @@ namespace OsEngine.Market.Servers.BloFin
 
                 string path = $"/api/v1/user/query-apikey";
 
-                IRestResponse response = CreatePrivateQuery(path, Method.GET, null);
+                IRestResponse response = CreatePrivateQuery(path, Method.GET);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -2161,16 +2225,7 @@ namespace OsEngine.Market.Servers.BloFin
 
         private string GenerateSignature(string timestamp, string method, string path, string body, string nonce)
         {
-            string prehashString;
-
-            if (body != null)
-            {
-                prehashString = $"{path}{method}{timestamp}{nonce}{body}";
-            }
-            else
-            {
-                prehashString = $"{path}{method}{timestamp}{nonce}";
-            }
+            string prehashString = $"{path}{method}{timestamp}{nonce}{body}";
 
             byte[] encodedString = Encoding.UTF8.GetBytes(prehashString);
 
@@ -2196,12 +2251,6 @@ namespace OsEngine.Market.Servers.BloFin
 
         #region 13 Log
 
-        public event Action<string, LogMessageType> LogMessageEvent;
-
-        public event Action<Funding> FundingUpdateEvent { add { } remove { } }
-
-        public event Action<SecurityVolumes> Volume24hUpdateEvent { add { } remove { } }
-
         private void SendLogMessage(string message, LogMessageType messageType)
         {
             if (LogMessageEvent != null)
@@ -2209,6 +2258,8 @@ namespace OsEngine.Market.Servers.BloFin
                 LogMessageEvent(message, messageType);
             }
         }
+
+        public event Action<string, LogMessageType> LogMessageEvent;
 
         #endregion 13
     }

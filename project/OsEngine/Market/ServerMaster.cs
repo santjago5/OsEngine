@@ -85,6 +85,7 @@ using OsEngine.Market.Servers.BybitData;
 using OsEngine.Market.Servers.Entity;
 using OsEngine.Market.Servers.GateIoData;
 using OsEngine.Market.Servers.BitGetData;
+using OsEngine.Market.Servers.MetaTrader5;
 
 namespace OsEngine.Market
 {
@@ -295,6 +296,7 @@ namespace OsEngine.Market
 
                 serverTypes.Add(ServerType.Alor);
                 serverTypes.Add(ServerType.QuikLua);
+                serverTypes.Add(ServerType.MetaTrader5);
                 serverTypes.Add(ServerType.Plaza);
                 serverTypes.Add(ServerType.Transaq);
                 serverTypes.Add(ServerType.TInvest);
@@ -768,6 +770,10 @@ namespace OsEngine.Market
                     {
                         newServer = new QuikLuaServer();
                     }
+                    else if (type == ServerType.MetaTrader5)
+                    {
+                        newServer = new MetaTrader5Server();
+                    }
                     else if (type == ServerType.InteractiveBrokers)
                     {
                         newServer = new InteractiveBrokersServer();
@@ -932,10 +938,12 @@ namespace OsEngine.Market
 
                                 SendNewLogMessage(OsLocalization.Market.Label245 + ": " + serverCurrent.ServerNameAndPrefix, LogMessageType.System);
 
-                                return;
+                                break;
                             }
                         }
                     }
+
+                    SaveServerInstanceByType(type);
                 }
             }
             catch (Exception ex)
@@ -1429,6 +1437,10 @@ namespace OsEngine.Market
                 else if (type == ServerType.QuikLua)
                 {
                     serverPermission = new QuikLuaServerPermission();
+                }
+                else if (type == ServerType.MetaTrader5)
+                {
+                    serverPermission = new MetaTrader5ServerPermission();
                 }
                 else if (type == ServerType.Atp)
                 {
@@ -2115,6 +2127,12 @@ namespace OsEngine.Market
         /// подключение к Т-Инвестициям (версия 3 коннектора)
         /// </summary>
         TInvest,
+
+        /// <summary>
+        /// Connecting to different forex brokers via the MT5 terminal
+        /// Подключение к разным форекс брокерам через терминал МТ5
+        /// </summary>
+        MetaTrader5,
 
         /// <summary>
         /// cryptocurrency exchange Gate.io

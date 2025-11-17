@@ -31,6 +31,9 @@ namespace OsEngine.Market.Servers.BitMex
 
             CreateParameterString(OsLocalization.Market.ServerParamId, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterSecretKey, "");
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label272;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
         }
     }
 
@@ -130,6 +133,8 @@ namespace OsEngine.Market.Servers.BitMex
         public event Action ConnectEvent;
 
         public event Action DisconnectEvent;
+
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
         #endregion
 

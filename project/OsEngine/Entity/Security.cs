@@ -106,17 +106,37 @@ namespace OsEngine.Entity
         /// </summary>
         public decimal PriceStepCost;
 
+        [Obsolete("Obsolete, please use MarginBuy or MarginSell.")]
+        public decimal Go
+        {
+            get
+            {
+                return MarginBuy;
+            }
+        }
+
         /// <summary>
-        /// warranty coverage
-        /// гарантийное обеспечение
+        /// initial margin on buy
+        /// гарантийное обеспечение для покупки
         /// </summary>
-        public decimal Go;
+        public decimal MarginBuy;
+
+        /// <summary>
+        /// initial margin on sell
+        /// гарантийное обеспечение для продажи
+        /// </summary>
+        public decimal MarginSell;
 
         /// <summary>
         /// security type
         /// тип бумаги
         /// </summary>
         public SecurityType SecurityType;
+
+        /// <summary>
+        /// нужно ли использовать в расчёте объёмов стоимость шага цены
+        /// </summary>
+        public bool UsePriceStepCostToCalculateVolume;
 
         /// <summary>
         /// open the Paper Settings window
@@ -250,7 +270,7 @@ namespace OsEngine.Entity
             PriceStep = array[5].ToDecimal();
             Lot = array[6].ToDecimal();
             PriceStepCost = array[7].ToDecimal();
-            Go = array[8].ToDecimal();
+            MarginBuy = array[8].ToDecimal();
             Enum.TryParse(array[9],out SecurityType);
             _decimals = Convert.ToInt32(array[10]);
             PriceLimitLow = array[11].ToDecimal();
@@ -269,6 +289,10 @@ namespace OsEngine.Entity
             {
                 Enum.TryParse(array[19], out MinTradeAmountType);
             }
+            if (array.Length > 20)
+            {
+                MarginSell = array[20].ToDecimal();
+            }
         }
 
         /// <summary>
@@ -285,7 +309,7 @@ namespace OsEngine.Entity
             result += PriceStep + "\n";
             result += Lot + "\n";
             result += PriceStepCost + "\n";
-            result += Go + "\n";
+            result += MarginBuy + "\n";
             result += SecurityType + "\n";
             result += _decimals + "\n";
             result += PriceLimitLow + "\n";
@@ -296,7 +320,8 @@ namespace OsEngine.Entity
             result += DecimalsVolume + "\n";
             result += MinTradeAmount + "\n";
             result += VolumeStep +"\n";
-            result += MinTradeAmountType;
+            result += MinTradeAmountType + "\n";
+            result += MarginSell ;
 
             return result;
         }
@@ -374,6 +399,12 @@ namespace OsEngine.Entity
         /// облигация
         /// </summary>
         Bond,
+
+        /// <summary>
+        /// Товары широкого потребления
+        /// Commodities
+        /// </summary>
+        Commodities,
 
         /// <summary>
         /// futures

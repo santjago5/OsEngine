@@ -29,9 +29,14 @@ namespace OsEngine.Market.Servers.GateIo.GateIoSpot
         {
             ServerNum = uniqueNumber;
             ServerRealization = new GateIoServerSpotRealization();
+
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterSecretKey, "");
             CreateParameterBoolean("Extended Data", false);
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
+            ServerParameters[2].Comment = OsLocalization.Market.Label269;
         }
     }
 
@@ -172,6 +177,8 @@ namespace OsEngine.Market.Servers.GateIo.GateIoSpot
         public event Action ConnectEvent;
 
         public event Action DisconnectEvent;
+
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
         #endregion
 

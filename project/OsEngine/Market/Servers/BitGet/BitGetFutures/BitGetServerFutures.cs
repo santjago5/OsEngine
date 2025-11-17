@@ -34,10 +34,24 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterSecretKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterPassphrase, "");
-            CreateParameterEnum("Hedge Mode", "On", new List<string> { "On", "Off" });
+            CreateParameterBoolean("Hedge Mode", true);
+            ServerParameters[3].ValueChange += BitGetServerFutures_ValueChange;
             CreateParameterEnum("Margin Mode", "Crossed", new List<string> { "Crossed", "Isolated" });
             CreateParameterBoolean("Demo Trading", false);
             CreateParameterBoolean("Extended Data", false);
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
+            ServerParameters[2].Comment = OsLocalization.Market.Label271;
+            ServerParameters[3].Comment = OsLocalization.Market.Label250;
+            ServerParameters[4].Comment = OsLocalization.Market.Label249;
+            ServerParameters[5].Comment = OsLocalization.Market.Label268;
+            ServerParameters[6].Comment = OsLocalization.Market.Label270;
+        }
+
+        private void BitGetServerFutures_ValueChange()
+        {
+            ((BitGetServerRealization)ServerRealization).HedgeMode = ((ServerParameterBool)ServerParameters[3]).Value;
         }
     }
 
@@ -82,6 +96,7 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
             PublicKey = ((ServerParameterString)ServerParameters[0]).Value;
             SeckretKey = ((ServerParameterPassword)ServerParameters[1]).Value;
             Passphrase = ((ServerParameterPassword)ServerParameters[2]).Value;
+            HedgeMode = ((ServerParameterBool)ServerParameters[3]).Value;
 
             if (string.IsNullOrEmpty(PublicKey) ||
                 string.IsNullOrEmpty(SeckretKey) ||
@@ -99,15 +114,6 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
             else
             {
                 _listCoin = new List<string>() { "USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES" };
-            }
-
-            if (((ServerParameterEnum)ServerParameters[3]).Value == "On")
-            {
-                _hedgeMode = true;
-            }
-            else
-            {
-                _hedgeMode = false;
             }
 
             if (((ServerParameterEnum)ServerParameters[4]).Value == "Crossed")
@@ -215,6 +221,8 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
 
         public event Action DisconnectEvent;
 
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
         #endregion
 
         #region 2 Properties
@@ -236,6 +244,21 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
         private List<string> _listCoin;
 
         private bool _hedgeMode;
+
+        public bool HedgeMode
+        {
+            get { return _hedgeMode; }
+            set
+            {
+                if (value == _hedgeMode)
+                {
+                    return;
+                }
+                _hedgeMode = value;
+
+                SetPositionMode();
+            }
+        }
 
         private string _marginMode = "crossed";
 
@@ -2318,41 +2341,35 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
             {
                 ResponseWebSocketMessageAction<List<ResponseWebsocketTrade>> responseTrade = JsonConvert.DeserializeAnonymousType(message, new ResponseWebSocketMessageAction<List<ResponseWebsocketTrade>>());
 
-                if (responseTrade == null)
+                if (responseTrade == null
+                    || responseTrade.data == null)
                 {
                     return;
                 }
 
-                if (responseTrade.data == null)
+                for (int i = 0; i < responseTrade.data.Count; i++)
                 {
-                    return;
+                    Trade trade = new Trade();
+                    trade.SecurityNameCode = responseTrade.arg.instId;
+                    trade.Price = responseTrade.data[i].price.ToDecimal();
+                    trade.Id = responseTrade.data[i].tradeId;
+
+                    if (trade.Id == null)
+                    {
+                        return;
+                    }
+
+                    trade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(responseTrade.data[i].ts));
+                    trade.Volume = responseTrade.data[i].size.ToDecimal();
+                    trade.Side = responseTrade.data[i].side.Equals("buy") ? Side.Buy : Side.Sell;
+
+                    if (_extendedMarketData)
+                    {
+                        trade.OpenInterest = GetOpenInterestValue(trade.SecurityNameCode);
+                    }
+
+                    NewTradesEvent(trade);
                 }
-
-                if (responseTrade.data[0] == null)
-                {
-                    return;
-                }
-
-                Trade trade = new Trade();
-                trade.SecurityNameCode = responseTrade.arg.instId;
-                trade.Price = responseTrade.data[0].price.ToDecimal();
-                trade.Id = responseTrade.data[0].tradeId;
-
-                if (trade.Id == null)
-                {
-                    return;
-                }
-
-                trade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(responseTrade.data[0].ts));
-                trade.Volume = responseTrade.data[0].size.ToDecimal();
-                trade.Side = responseTrade.data[0].side.Equals("buy") ? Side.Buy : Side.Sell;
-
-                if (_extendedMarketData)
-                {
-                    trade.OpenInterest = GetOpenInterestValue(trade.SecurityNameCode);
-                }
-
-                NewTradesEvent(trade);
             }
             catch (Exception ex)
             {
@@ -2528,7 +2545,7 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
                 string trSide = "open";
                 string posSide;
 
-                if (_hedgeMode)
+                if (HedgeMode)
                 {
                     if (order.PositionConditionType == OrderPositionConditionType.Close)
                     {
@@ -2570,7 +2587,7 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
                 jsonContent.Add("size", order.Volume.ToString().Replace(",", "."));
                 jsonContent.Add("clientOid", order.NumberUser);
 
-                if (_hedgeMode)
+                if (HedgeMode)
                 {
                     jsonContent.Add("tradeSide", trSide);
                 }
@@ -3396,7 +3413,7 @@ namespace OsEngine.Market.Servers.BitGet.BitGetFutures
                 {
                     Dictionary<string, string> jsonContent = new Dictionary<string, string>();
 
-                    jsonContent.Add("posMode", _hedgeMode == true ? "hedge_mode" : "one_way_mode");
+                    jsonContent.Add("posMode", HedgeMode == true ? "hedge_mode" : "one_way_mode");
                     jsonContent.Add("productType", _listCoin[i]);
 
                     string jsonRequest = JsonConvert.SerializeObject(jsonContent);

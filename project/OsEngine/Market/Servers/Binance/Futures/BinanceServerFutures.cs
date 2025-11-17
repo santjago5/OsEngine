@@ -47,6 +47,14 @@ namespace OsEngine.Market.Servers.Binance.Futures
             ServerParameters[3].ValueChange += BinanceServerFutures_ValueChange;
             CreateParameterBoolean("Demo Account", false);
             CreateParameterBoolean("Extended Data", false);
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
+            ServerParameters[2].Comment = OsLocalization.Market.Label254;
+            ServerParameters[3].Comment = OsLocalization.Market.Label250;
+            ServerParameters[4].Comment = OsLocalization.Market.Label268;
+            ServerParameters[5].Comment = OsLocalization.Market.Label270;
+
         }
 
         private void BinanceServerFutures_ValueChange()
@@ -205,6 +213,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
         public event Action ConnectEvent;
 
         public event Action DisconnectEvent;
+
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
         #endregion
 
@@ -2239,7 +2249,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     MyTradeEvent(trade);
                 }
 
-                if (order.X == "FILLED")
+                if (order.X == "FILLED" 
+                    || order.X == "PARTIALLY_FILLED")
                 {
                     Order newOrder = new Order();
                     newOrder.SecurityNameCode = order.s;

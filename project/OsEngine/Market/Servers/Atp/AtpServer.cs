@@ -346,6 +346,8 @@ namespace OsEngine.Market.Servers.Atp
 
         public event Action DisconnectEvent;
 
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
         public bool TradeRouterIsActivate
         {
             get
@@ -594,7 +596,7 @@ namespace OsEngine.Market.Servers.Atp
                         newSec.PriceStep = array[6].ToDecimal();
                         newSec.Lot = array[7].ToDecimal();
                         newSec.PriceStepCost = array[8].ToDecimal();
-                        newSec.Go = array[9].ToDecimal();
+                        newSec.MarginBuy = array[9].ToDecimal();
                         Enum.TryParse(array[10], out newSec.SecurityType);
                         newSec.Decimals = Convert.ToInt32(array[11]);
                         newSec.PriceLimitLow = array[12].ToDecimal();
@@ -635,7 +637,7 @@ namespace OsEngine.Market.Servers.Atp
                         result += _securities[i].PriceStep + "!";
                         result += _securities[i].Lot + "!";
                         result += _securities[i].PriceStepCost + "!";
-                        result += _securities[i].Go + "!";
+                        result += _securities[i].MarginBuy + "!";
                         result += _securities[i].SecurityType + "!";
                         result += _securities[i].Decimals + "!";
                         result += _securities[i].PriceLimitLow + "!";

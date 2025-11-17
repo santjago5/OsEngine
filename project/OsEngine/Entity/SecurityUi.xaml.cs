@@ -25,17 +25,22 @@ namespace OsEngine.Entity
 
             CultureInfo culture = new CultureInfo("ru-RU");
 
-            TextBoxGoPersent.Text = (security.Go).ToString(culture);
+            TextBoxGoPrice.Text = (security.MarginBuy).ToString(culture);
+            TextBoxMarginSell.Text = (security.MarginSell).ToString(culture);
             TextBoxLot.Text = security.Lot.ToString(culture);
             TextBoxStep.Text = security.PriceStep.ToString(culture);
             TextBoxStepCost.Text = security.PriceStepCost.ToString(culture);
             TextBoxVolumeDecimals.Text = security.DecimalsVolume.ToString(culture);
+            TextBoxExpiration.Text = security.Expiration.ToString(culture);
 
             Title = OsLocalization.Entity.TitleSecurityUi;
             SecuritiesColumn3.Content = OsLocalization.Entity.SecuritiesColumn3;
             SecuritiesColumn4.Content = OsLocalization.Entity.SecuritiesColumn4;
             SecuritiesColumn5.Content = OsLocalization.Entity.SecuritiesColumn5;
             SecuritiesColumn6.Content = OsLocalization.Entity.SecuritiesColumn6;
+            LabelSecuritiesMarginSell.Content = OsLocalization.Entity.SecuritiesColumn21;
+            SecuritiesExpiration.Content = OsLocalization.Entity.SecuritiesColumn18;
+
             SecuritiesVolumeDecimals.Content = OsLocalization.Entity.SecuritiesColumn7;
             ButtonAccept.Content = OsLocalization.Entity.ButtonAccept;
 
@@ -54,19 +59,23 @@ namespace OsEngine.Entity
 
         private void ButtonAccept_Click(object sender, RoutedEventArgs e)
         {
-            decimal go;
+            decimal marginBuy;
+            decimal marginSell;
             decimal lot;
             decimal step;
             decimal stepCost;
             int volDecimals;
+            DateTime expiration;
 
             try
             {
-                go = TextBoxGoPersent.Text.ToDecimal();
+                marginBuy = TextBoxGoPrice.Text.ToDecimal();
+                marginSell = TextBoxMarginSell.Text.ToDecimal();
                 lot = TextBoxLot.Text.ToDecimal();
                 step = TextBoxStep.Text.ToDecimal();
                 stepCost = TextBoxStepCost.Text.ToDecimal();
                 volDecimals = Convert.ToInt32(TextBoxVolumeDecimals.Text);
+                expiration = Convert.ToDateTime(TextBoxExpiration.Text);
 
                 string message = OsLocalization.Message.HintMessageError5 + "\n";
 
@@ -84,7 +93,8 @@ namespace OsEngine.Entity
                     index++;
                 }
 
-                if (go < 0)
+                if (marginBuy < 0
+                    || marginSell < 0)
                 {
                     message += index + 1 + ") " + OsLocalization.Message.HintMessageError2 + "\n";
                     index++;
@@ -116,13 +126,13 @@ namespace OsEngine.Entity
                 return;
             }
 
-            
-
-            _security.Go = go;
+            _security.MarginBuy = marginBuy;
+            _security.MarginSell = marginSell;
             _security.Lot = lot;
             _security.PriceStep = step;
             _security.PriceStepCost = stepCost;
             _security.DecimalsVolume = volDecimals;
+            _security.Expiration = expiration;
             IsChanged = true;
             Close();
         }
@@ -145,6 +155,12 @@ namespace OsEngine.Entity
             ui.ShowDialog();
         }
 
+        private void ButtonInfoMarginSell_Click(object sender, RoutedEventArgs e)
+        {
+            CustomMessageBoxUi ui = new CustomMessageBoxUi(OsLocalization.Message.HintMessageLabel2);
+            ui.ShowDialog();
+        }
+
         private void ButtonInfoLot_Click(object sender, RoutedEventArgs e)
         {
             CustomMessageBoxUi ui = new CustomMessageBoxUi(OsLocalization.Message.HintMessageLabel3);
@@ -154,6 +170,12 @@ namespace OsEngine.Entity
         private void ButtonInfoVolume_Click(object sender, RoutedEventArgs e)
         {
             CustomMessageBoxUi ui = new CustomMessageBoxUi(OsLocalization.Message.HintMessageLabel4);
+            ui.ShowDialog();
+        }
+
+        private void ButtonInfoExpiration_Click(object sender, RoutedEventArgs e)
+        {
+            CustomMessageBoxUi ui = new CustomMessageBoxUi(OsLocalization.Message.HintMessageLabel8);
             ui.ShowDialog();
         }
     }

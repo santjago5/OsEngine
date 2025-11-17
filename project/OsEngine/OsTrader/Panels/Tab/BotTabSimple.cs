@@ -535,6 +535,21 @@ namespace OsEngine.OsTrader.Panels.Tab
         }
 
         /// <summary>
+        /// If it is true, then the connector is in a non-trading period. It is better not to perform trading operations.
+        /// </summary>
+        public bool IsNonTradePeriodInConnector
+        {
+            get 
+            {
+                if (_connector == null)
+                {
+                    return false;
+                }
+                return _connector.IsNonTradePeriodInConnector;
+            }
+        }
+
+        /// <summary>
         /// The program that created the object
         /// </summary>
         public StartProgram StartProgram;
@@ -4743,7 +4758,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                     orderType, ManualPositionSupport.SecondToOpen, 
                     StartProgram, OrderPositionConditionType.Open, 
                     ManualPositionSupport.OrderTypeTime, _connector.ServerFullName,
-                    ManualPositionSupport.LimitsMakerOnly);
+                    ManualPositionSupport.LimitsMakerOnly, position.Number);
 
                 newOrder.IsStopOrProfit = isStopOrProfit;
                 newOrder.LifeTime = timeLife;
@@ -4882,7 +4897,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                     OrderPositionConditionType.Open,
                     ManualPositionSupport.OrderTypeTime, 
                     _connector.ServerFullName,
-                    ManualPositionSupport.LimitsMakerOnly);
+                    ManualPositionSupport.LimitsMakerOnly, position.Number);
 
                 newOrder.IsStopOrProfit = isStopOrProfit;
                 newOrder.LifeTime = timeLife;
@@ -6632,7 +6647,15 @@ namespace OsEngine.OsTrader.Panels.Tab
                     _lastTradeIndex == 0)
                 {
                     _lastTradeIndex = trades.Count;
-                    _lastTradeTime = trades[trades.Count - 1].Time;
+                    try
+                    {
+                        _lastTradeTime = trades[trades.Count - 1].Time;
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                   
                     return;
                 }
             }

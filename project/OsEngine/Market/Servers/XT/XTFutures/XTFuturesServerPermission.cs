@@ -49,16 +49,6 @@ namespace OsEngine.Market.Servers.XT.XTFutures
             get { return false; }
         }
 
-        public bool DataFeedTfTickCanLoad
-        {
-            get { return false; }
-        }
-
-        public bool DataFeedTfMarketDepthCanLoad
-        {
-            get { return false; }
-        }
-
         public bool DataFeedTf1MinuteCanLoad
         {
             get { return true; }
@@ -109,6 +99,16 @@ namespace OsEngine.Market.Servers.XT.XTFutures
             get { return true; }
         }
 
+        public bool DataFeedTfTickCanLoad
+        {
+            get { return false; }
+        }
+
+        public bool DataFeedTfMarketDepthCanLoad
+        {
+            get { return false; }
+        }
+
         #endregion
 
         #region Trade permission
@@ -125,9 +125,9 @@ namespace OsEngine.Market.Servers.XT.XTFutures
 
         public bool IsCanChangeOrderPrice
         {
-            get { return true; }
+            get { return false; }
         }
-        
+
         public bool UseStandardCandlesStarter
         {
             get { return true; }
@@ -142,7 +142,7 @@ namespace OsEngine.Market.Servers.XT.XTFutures
         {
             get { return _tradeTimeFramePermission; }
         }
-        
+
         private TimeFramePermission _tradeTimeFramePermission
             = new TimeFramePermission()
             {
@@ -175,8 +175,7 @@ namespace OsEngine.Market.Servers.XT.XTFutures
                 string[] values = new string[]
                 {
                     "_LONG",
-                    "_SHORT",
-                    "_BOTH"
+                    "_SHORT"
                 };
 
                 return values;
@@ -189,7 +188,7 @@ namespace OsEngine.Market.Servers.XT.XTFutures
             {
                 string[] values = new string[]
                 {
-                    "USDT" 
+                    "usdt"
                 };
 
                 return values;
@@ -197,11 +196,6 @@ namespace OsEngine.Market.Servers.XT.XTFutures
         }
 
         public bool ManuallyClosePositionOnBoard_IsOn
-        {
-            get { return true; }
-        }
-        
-        public bool IsTradeServer
         {
             get { return true; }
         }
@@ -257,7 +251,7 @@ namespace OsEngine.Market.Servers.XT.XTFutures
 
         public bool IsSupports_AsyncOrderSending
         {
-            get { return true; }
+            get { return false; }
         }
 
         public int AsyncOrderSending_RateGateLimitMls
@@ -267,7 +261,7 @@ namespace OsEngine.Market.Servers.XT.XTFutures
 
         public bool IsSupports_AsyncCandlesStarter
         {
-            get { return true; }
+            get { return false; }
         }
 
         public int AsyncCandlesStarter_RateGateLimitMls
@@ -288,6 +282,11 @@ namespace OsEngine.Market.Servers.XT.XTFutures
 
                 return pingIpDomens;
             }
+        }
+
+        public bool HaveOnlyMakerLimitsRealization
+        {
+            get { return false; }
         }
 
         #endregion

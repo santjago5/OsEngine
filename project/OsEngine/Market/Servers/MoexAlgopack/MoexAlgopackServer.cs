@@ -101,6 +101,8 @@ namespace OsEngine.Market.Servers.MoexAlgopack
 
             public event Action DisconnectEvent;
 
+            public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
             #endregion
 
             #region 2 Properties
@@ -213,7 +215,7 @@ namespace OsEngine.Market.Servers.MoexAlgopack
                     newSecurity.DecimalsVolume = 0;
                     newSecurity.PriceStep = item[6].ToDecimal();
                     newSecurity.PriceStepCost = newSecurity.PriceStep;
-                    newSecurity.Go = item[14].ToDecimal();
+                    newSecurity.MarginBuy = item[14].ToDecimal();
                     newSecurity.Expiration = DateTime.Parse(item[7],CultureInfo.InvariantCulture); 
                     newSecurity.State = SecurityStateType.Activ;
                     securities.Add(newSecurity);

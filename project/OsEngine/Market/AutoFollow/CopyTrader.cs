@@ -499,7 +499,11 @@ namespace OsEngine.Market.AutoFollow
                 }
             }
 
-            positionToCopy.SlaveSecurityName = positionToCopy.SecurityNameMaster;
+            if(positionToCopy.SlaveSecurityName == null)
+            {
+                positionToCopy.SlaveSecurityName = positionToCopy.SecurityNameMaster;
+            }
+         
             
 
         }
@@ -747,7 +751,7 @@ namespace OsEngine.Market.AutoFollow
 
             if(copyServerTime == DateTime.MinValue)
             {
-                return;
+                copyServerTime = DateTime.Now;
             }
 
             if (TradePeriodsSettings.CanTradeThisTime(copyServerTime) == false)
@@ -1338,7 +1342,7 @@ namespace OsEngine.Market.AutoFollow
                         security, direction, price, volume, priceType, 
                         timeLife, StartProgram.IsOsTrader, OrderPositionConditionType.Open, 
                         orderTypeTime, MyCopyServer.ServerNameUnique,
-                        false);
+                        false, deal.Number);
 
                     newOrder.PortfolioNumber = this.PortfolioName;
                     deal.AddNewOpenOrder(newOrder);
@@ -1384,13 +1388,13 @@ namespace OsEngine.Market.AutoFollow
             {
                 if (volume <= 0)
                 {
-                    SendLogMessage("Buy at market Error. \n"
+                    SendLogMessage("Sell at market Error. \n"
                     + "Volume: " + volume + "\n"
                     + "Security: " + security.Name, LogMessageType.Error);
                     return null;
                 }
 
-                SendLogMessage("Buy at market. \n"
+                SendLogMessage("Sell at market. \n"
                 + "Volume: " + volume + "\n"
                 + "Security: " + security.Name, LogMessageType.Trade);
 
@@ -1424,7 +1428,7 @@ namespace OsEngine.Market.AutoFollow
                         security, direction, price, volume, priceType, 
                         timeLife, StartProgram.IsOsTrader,
                         OrderPositionConditionType.Open, orderTypeTime, 
-                        deal.ServerName, false);
+                        deal.ServerName, false, deal.Number);
 
                     newOrder.PortfolioNumber = this.PortfolioName;
                     deal.AddNewOpenOrder(newOrder);

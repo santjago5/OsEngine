@@ -16,8 +16,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 using OsEngine.Entity.WebSocketOsEngine;
-using Microsoft.Extensions.Logging.Abstractions;
-using TL.Methods;
 
 namespace OsEngine.Market.Servers.Alor
 {
@@ -208,6 +206,8 @@ namespace OsEngine.Market.Servers.Alor
 
         public event Action DisconnectEvent;
 
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
         #endregion
 
         #region 2 Properties
@@ -330,11 +330,6 @@ namespace OsEngine.Market.Servers.Alor
                 {
                     AlorSecurity item = stocks[i];
 
-                    if(item.symbol == "IMOEX2")
-                    {
-
-                    }
-
                     SecurityType instrumentType = GetSecurityType(item);
 
                     if (!CheckNeedSecurity(instrumentType))
@@ -355,20 +350,18 @@ namespace OsEngine.Market.Servers.Alor
                     newSecurity.Name = item.symbol;
                     newSecurity.NameFull = item.symbol + "_" + item.board;
 
-                    if (newSecurity.Name == "SBERF"
-                      || newSecurity.Name == "GAZPF")
+                    newSecurity.Lot = item.lotsize.ToDecimal();
+
+                    if (instrumentType == SecurityType.Futures
+                        || instrumentType == SecurityType.Option)
                     {
-                        newSecurity.Lot = 100;
-                    }
-                    else
-                    {
-                        newSecurity.Lot = item.lotsize.ToDecimal();
+                        newSecurity.UsePriceStepCostToCalculateVolume = true;
                     }
 
                     if (newSecurity.SecurityType == SecurityType.Option)
                     {
-                        
-                        newSecurity.Go = item.marginbuy.ToDecimal();
+                        newSecurity.MarginBuy = item.marginbuy.ToDecimal();
+                        newSecurity.MarginSell = item.marginsell.ToDecimal();
 
                         if(item.type != null &&
                             item.type.Contains("Прем. европ. Call "))
@@ -468,7 +461,8 @@ namespace OsEngine.Market.Servers.Alor
                     else if (newSecurity.SecurityType == SecurityType.Futures)
                     {
                         newSecurity.NameClass = "Futures";
-                        newSecurity.Go = item.marginbuy.ToDecimal();
+                        newSecurity.MarginBuy = item.marginbuy.ToDecimal();
+                        newSecurity.MarginSell = item.marginsell.ToDecimal();
                     }
                     else if (newSecurity.SecurityType == SecurityType.CurrencyPair)
                     {

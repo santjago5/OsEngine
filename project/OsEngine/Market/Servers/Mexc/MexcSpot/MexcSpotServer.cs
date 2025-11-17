@@ -34,6 +34,9 @@ namespace OsEngine.Market.Servers.Mexc
 
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterSecretKey, "");
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
         }
     }
 
@@ -150,6 +153,8 @@ namespace OsEngine.Market.Servers.Mexc
         public event Action ConnectEvent;
 
         public event Action DisconnectEvent;
+
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
         #endregion
 
@@ -1275,7 +1280,7 @@ namespace OsEngine.Market.Servers.Mexc
                                 {
                                     string securityName = _subscribedSecurities[j];
 
-                                    _webSocketPublic.SendAsync($"{{ \"method\": \"UNSUBSCRIPTION\", \"params\": [\"spot@public.deals.v3.api.pb@{securityName}\"] }}");
+                                    _webSocketPublic.SendAsync($"{{ \"method\": \"UNSUBSCRIPTION\", \"params\": [\"spot@public.aggre.deals.v3.api.pb@100ms@{securityName}\"] }}");
                                     _webSocketPublic.SendAsync($"{{ \"method\": \"UNSUBSCRIPTION\", \"params\": [\"spot@public.limit.depth.v3.api.pb@{securityName}@20\"] }}");
                                 }
                             }

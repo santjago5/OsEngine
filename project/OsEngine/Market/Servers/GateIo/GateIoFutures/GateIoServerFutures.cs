@@ -31,12 +31,33 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
         {
             ServerNum = uniqueNumber;
             ServerRealization = new GateIoServerFuturesRealization();
+
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParameterSecretKey, "");
             CreateParameterString("User ID", "");
-            CreateParameterEnum("Base Wallet", "USDT", new List<string> { "USDT", "BTC" });
+            CreateParameterEnum("Currency", "USDT", new List<string> { "USDT", "BTC" });
             CreateParameterEnum("Hedge Mode", "On", new List<string> { "On", "Off" });
+            ServerParameters[4].ValueChange += GateIoServerFutures_ValueChange;
             CreateParameterBoolean("Extended Data", false);
+
+            ServerParameters[0].Comment = OsLocalization.Market.Label246;
+            ServerParameters[1].Comment = OsLocalization.Market.Label247;
+            ServerParameters[2].Comment = OsLocalization.Market.Label277;
+            ServerParameters[3].Comment = OsLocalization.Market.Label274;
+            ServerParameters[4].Comment = OsLocalization.Market.Label250;
+            ServerParameters[5].Comment = OsLocalization.Market.Label270;
+        }
+
+        private void GateIoServerFutures_ValueChange()
+        {
+            if (((ServerParameterEnum)ServerParameters[4]).Value == "On")
+            {
+                ((GateIoServerFuturesRealization)ServerRealization).HedgeMode = true;
+            }
+            else
+            {
+                ((GateIoServerFuturesRealization)ServerRealization).HedgeMode = false;
+            }
         }
     }
 
@@ -99,11 +120,11 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
 
             if (((ServerParameterEnum)ServerParameters[4]).Value == "On")
             {
-                _hedgeMode = true;
+                HedgeMode = true;
             }
             else
             {
-                _hedgeMode = false;
+                HedgeMode = false;
             }
 
             if (((ServerParameterBool)ServerParameters[5]).Value == true)
@@ -154,7 +175,6 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
             {
                 CreatePublicWebSocketConnect();
                 CreatePrivateWebSocketConnect();
-                //SetDualMode();
             }
             else
             {
@@ -171,7 +191,7 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
 
             try
             {
-                string mode = _hedgeMode == true ? "true" : "false";
+                string mode = HedgeMode == true ? "true" : "false";
                 string queryParam = $"dual_mode={mode}";
                 string endpoint = $"{_path}/{_wallet}/dual_mode?{queryParam}";
 
@@ -247,6 +267,8 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
 
         public event Action DisconnectEvent;
 
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
         #endregion
 
         #region 2 Properties
@@ -262,6 +284,21 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
         private string _userId = "";
 
         private bool _hedgeMode;
+
+        public bool HedgeMode
+        {
+            get { return _hedgeMode; }
+            set
+            {
+                if (value == _hedgeMode)
+                {
+                    return;
+                }
+                _hedgeMode = value;
+
+                SetDualMode();
+            }
+        }
 
         private bool _extendedMarketData;
 
@@ -2067,24 +2104,29 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
 
                     OrderStateType orderState = OrderStateType.None;
 
-                    if (responseOrders.result[i].status.Equals("open"))
+                    if (responseOrders.result[i].finish_as.Equals("_new"))
                     {
                         orderState = OrderStateType.Active;
                     }
+                    else if (responseOrders.result[i].finish_as.Equals("cancelled"))
+                    {
+                        orderState = OrderStateType.Cancel;
+                    }
+                    else if (responseOrders.result[i].finish_as.Equals("liquidated"))
+                    {
+                        orderState = OrderStateType.Fail;
+                    }
+                    else if (responseOrders.result[i].finish_as.Equals("filled"))
+                    {
+                        orderState = OrderStateType.Done;
+                    }
+                    else if (responseOrders.result[i].finish_as.Equals("_update"))
+                    {
+                        orderState = OrderStateType.Partial;
+                    }
                     else
                     {
-                        if (responseOrders.result[i].finish_as.Equals("cancelled"))
-                        {
-                            orderState = OrderStateType.Cancel;
-                        }
-                        else if (responseOrders.result[i].finish_as.Equals("liquidated"))
-                        {
-                            orderState = OrderStateType.Fail;
-                        }
-                        else if (responseOrders.result[i].finish_as.Equals("filled"))
-                        {
-                            orderState = OrderStateType.Done;
-                        }
+                        orderState = OrderStateType.None;
                     }
 
                     try
@@ -2200,7 +2242,7 @@ namespace OsEngine.Market.Servers.GateIo.GateIoFutures
 
                 string bodyContent;
 
-                if (_hedgeMode)
+                if (HedgeMode)
                 {
                     if (order.PositionConditionType == OrderPositionConditionType.Close)
                     {

@@ -269,7 +269,6 @@ namespace OsEngine.Market.Servers.Optimizer
         {
             while (true)
             {
-                Thread.Sleep(50);
                 try
                 {
                     if (_isDeleted == true)
@@ -288,6 +287,8 @@ namespace OsEngine.Market.Servers.Optimizer
                     SendLogMessage(error.ToString(), LogMessageType.Error);
                     Thread.Sleep(1000);
                 }
+
+                Thread.Sleep(50);
             }
         }
 
@@ -487,7 +488,8 @@ namespace OsEngine.Market.Servers.Optimizer
                     security[security.Count - 1].Security.Name = name;
                     security[security.Count - 1].Security.Lot = 1;
                     security[security.Count - 1].Security.NameClass = "TestClass";
-                    security[security.Count - 1].Security.Go = 1;
+                    security[security.Count - 1].Security.MarginBuy = 1;
+                    security[security.Count - 1].Security.MarginSell = 1;
                     security[security.Count - 1].Security.PriceStepCost = 1;
                     security[security.Count - 1].Security.PriceStep = 1;
                     // timeframe / тф
@@ -795,7 +797,8 @@ namespace OsEngine.Market.Servers.Optimizer
                 security[security.Count - 1].Security.Name = name;
                 security[security.Count - 1].Security.Lot = 1;
                 security[security.Count - 1].Security.NameClass = "TestClass";
-                security[security.Count - 1].Security.Go = 1;
+                security[security.Count - 1].Security.MarginBuy = 1;
+                security[security.Count - 1].Security.MarginSell = 1;
                 security[security.Count - 1].Security.PriceStepCost = 1;
                 security[security.Count - 1].Security.PriceStep = 1;
                 // timeframe / тф
@@ -1021,7 +1024,8 @@ namespace OsEngine.Market.Servers.Optimizer
                 security[security.Count - 1].Security.Name = name;
                 security[security.Count - 1].Security.Lot = 1;
                 security[security.Count - 1].Security.NameClass = "TestClass";
-                security[security.Count - 1].Security.Go = 1;
+                security[security.Count - 1].Security.MarginBuy = 1;
+                security[security.Count - 1].Security.MarginSell = 1;
                 security[security.Count - 1].Security.PriceStepCost = 1;
                 security[security.Count - 1].Security.PriceStep = 1;
                 // timeframe / тф
@@ -1501,21 +1505,39 @@ namespace OsEngine.Market.Servers.Optimizer
                         decimal priceStep = array[i][4].ToDecimal();
 
                         int volDecimals = 0;
+                        decimal goSell = 0;
 
                         if (array[i].Length > 5)
                         {
                             volDecimals = Convert.ToInt32(array[i][5]);
                         }
+                        if (array[i].Length > 6)
+                        {
+                            goSell = Convert.ToInt32(array[i][6]);
+                        }
 
                         if (lot != 0)
+                        {
                             secu.Lot = lot;
+                        }
+                            
                         if (go != 0)
-                            secu.Go = go;
+                        {
+                            secu.MarginBuy = go;
+                        }
+                           
                         if (priceStepCost != 0)
+                        {
                             secu.PriceStepCost = priceStepCost;
+                        }
+                           
                         if (priceStep != 0)
+                        {
                             secu.PriceStep = priceStep;
+                        }
+                        
                         secu.DecimalsVolume = volDecimals;
+                        secu.MarginSell = goSell;
                     }
                 }
             }
@@ -1638,10 +1660,11 @@ namespace OsEngine.Market.Servers.Optimizer
                 {
                     securityToSave.Name,
                     securityToSave.Lot.ToString(culture),
-                    securityToSave.Go.ToString(culture),
+                    securityToSave.MarginBuy.ToString(culture),
                     securityToSave.PriceStepCost.ToString(culture),
                     securityToSave.PriceStep.ToString(culture),
-                    securityToSave.DecimalsVolume.ToString(culture)
+                    securityToSave.DecimalsVolume.ToString(culture),
+                    securityToSave.MarginSell.ToString(culture)
                 });
             }
 
@@ -1661,10 +1684,11 @@ namespace OsEngine.Market.Servers.Optimizer
                 {
                     securityToSave.Name,
                     securityToSave.Lot.ToString(culture),
-                    securityToSave.Go.ToString(culture),
+                    securityToSave.MarginBuy.ToString(culture),
                     securityToSave.PriceStepCost.ToString(culture),
                     securityToSave.PriceStep.ToString(culture),
-                    securityToSave.DecimalsVolume.ToString(culture)
+                    securityToSave.DecimalsVolume.ToString(culture),
+                    securityToSave.MarginSell.ToString(culture)
                 });
             }
 
@@ -1681,7 +1705,8 @@ namespace OsEngine.Market.Servers.Optimizer
                             saves[i][2] + "$" +
                             saves[i][3] + "$" +
                             saves[i][4] + "$" +
-                            saves[i][5]
+                            saves[i][5] + "$" +
+                            saves[i][6]
                             );
                     }
 
@@ -1716,6 +1741,8 @@ namespace OsEngine.Market.Servers.Optimizer
                     {
                         return storage;
                     }
+
+
                     storage = LoadCandlesFromFolder(security, timeFrame, timeStart, timeEnd);
 
                     if (storage == null)
@@ -1733,6 +1760,8 @@ namespace OsEngine.Market.Servers.Optimizer
 
                     _storages.Add(storage);
                     return storage;
+
+
                 }
                 if (_typeTesterData == TesterDataType.TickOnlyReadyCandle)
                 {
@@ -1819,15 +1848,81 @@ namespace OsEngine.Market.Servers.Optimizer
         private DataStorage LoadCandlesFromFolder(Security security, TimeFrame timeFrame, DateTime timeStart,
             DateTime timeEnd)
         {
-            lock (_lockerLoadCandles)
+            try
+            {
+                lock (_lockerLoadCandles)
+                {
+
+                    SecurityTester sec =
+                    SecuritiesTester.Find(
+                        s =>
+                            s != null &&
+                            s.Security.Name == security.Name && s.TimeFrame == timeFrame &&
+                            s.DataType == SecurityTesterDataType.Candle);
+
+                    if (sec == null)
+                    {
+                        return null;
+                    }
+
+                    StreamReader reader = new StreamReader(sec.FileAddress);
+                    List<Candle> candles = new List<Candle>();
+
+                    while (!reader.EndOfStream)
+                    {
+                        Candle candle = new Candle();
+                        try
+                        {
+                            candle.SetCandleFromString(reader.ReadLine());
+                            candle.State = CandleState.Finished;
+                        }
+                        catch
+                        {
+                            //SendLogMessage(OsLocalization.Market.Message31 + sec.FileAdress, LogMessageType.Error);
+                            continue;
+                        }
+                        if (candle.TimeStart < timeStart)
+                        {
+                            continue;
+                        }
+                        else if (candle.TimeStart > timeEnd.AddDays(1))
+                        {
+                            break;
+                        }
+                        candles.Add(candle);
+                    }
+
+                    if (candles.Count == 0)
+                    {
+                        SendLogMessage(OsLocalization.Market.Message32 + timeStart.ToShortDateString() +
+                                       OsLocalization.Market.Message33 + timeEnd.ToShortDateString() +
+                                       OsLocalization.Market.Message14 + security.Name, LogMessageType.Error);
+                    }
+
+                    DataStorage storage = new DataStorage();
+                    storage.Candles = candles;
+                    storage.Security = security;
+                    storage.TimeEnd = timeEnd;
+                    storage.TimeStart = timeStart;
+                    storage.StorageType = TesterDataType.Candle;
+
+                    return storage;
+                }
+            }
+            catch (Exception ex)
+            {
+                SendLogMessage(ex.ToString(), LogMessageType.Error);
+            }
+
+            return null;
+        }
+
+        private DataStorage LoadTradesFromFolder(Security security, DateTime timeStart, DateTime timeEnd)
+        {
+            try
             {
 
-                SecurityTester sec =
-                SecuritiesTester.Find(
-                    s =>
-                        s != null &&
-                        s.Security.Name == security.Name && s.TimeFrame == timeFrame &&
-                        s.DataType == SecurityTesterDataType.Candle);
+                SecurityTester sec = SecuritiesTester.Find(s => s.Security.Name == security.Name && s.DataType == SecurityTesterDataType.Tick);
 
                 if (sec == null)
                 {
@@ -1835,153 +1930,114 @@ namespace OsEngine.Market.Servers.Optimizer
                 }
 
                 StreamReader reader = new StreamReader(sec.FileAddress);
-                List<Candle> candles = new List<Candle>();
+                List<Trade> trades = new List<Trade>();
 
                 while (!reader.EndOfStream)
                 {
-                    Candle candle = new Candle();
+                    Trade trade = new Trade();
                     try
                     {
-                        candle.SetCandleFromString(reader.ReadLine());
-                        candle.State = CandleState.Finished;
+                        trade.SetTradeFromString(reader.ReadLine());
+                        trade.IdInTester = _tradesId++;
+                        trade.SecurityNameCode = security.Name;
                     }
                     catch
                     {
-                        //SendLogMessage(OsLocalization.Market.Message31 + sec.FileAdress, LogMessageType.Error);
-                        continue;
+                        SendLogMessage(OsLocalization.Market.Message31 + sec.FileAddress, LogMessageType.Error);
+                        break;
                     }
-                    if (candle.TimeStart < timeStart)
+                    if (trade.Time < timeStart)
                     {
                         continue;
                     }
-                    else if (candle.TimeStart > timeEnd.AddDays(1))
+                    else if (trade.Time > timeEnd)
                     {
                         break;
                     }
-                    candles.Add(candle);
+                    trades.Add(trade);
                 }
 
-                if (candles.Count == 0)
+                if (trades.Count == 0)
                 {
-                    SendLogMessage(OsLocalization.Market.Message32 + timeStart.ToShortDateString() +
-                                   OsLocalization.Market.Message33 + timeEnd.ToShortDateString() +
-                                   OsLocalization.Market.Message14 + security.Name, LogMessageType.Error);
+                    SendLogMessage(OsLocalization.Market.Message34 + timeStart.ToShortDateString() +
+                                   OsLocalization.Market.Message33 + timeEnd.ToShortDateString() + OsLocalization.Market.Message14 + security.Name, LogMessageType.Error);
                 }
 
                 DataStorage storage = new DataStorage();
-                storage.Candles = candles;
+                storage.Trades = trades;
                 storage.Security = security;
                 storage.TimeEnd = timeEnd;
                 storage.TimeStart = timeStart;
-                storage.StorageType = TesterDataType.Candle;
+                storage.StorageType = TesterDataType.TickOnlyReadyCandle;
 
                 return storage;
             }
-        }
-
-        private DataStorage LoadTradesFromFolder(Security security, DateTime timeStart, DateTime timeEnd)
-        {
-            SecurityTester sec = SecuritiesTester.Find(s => s.Security.Name == security.Name && s.DataType == SecurityTesterDataType.Tick);
-
-            if (sec == null)
+            catch (Exception ex)
             {
-                return null;
+                SendLogMessage(ex.ToString(), LogMessageType.Error);
             }
-
-            StreamReader reader = new StreamReader(sec.FileAddress);
-            List<Trade> trades = new List<Trade>();
-
-            while (!reader.EndOfStream)
-            {
-                Trade trade = new Trade();
-                try
-                {
-                    trade.SetTradeFromString(reader.ReadLine());
-                    trade.IdInTester = _tradesId++;
-                    trade.SecurityNameCode = security.Name;
-                }
-                catch
-                {
-                    SendLogMessage(OsLocalization.Market.Message31 + sec.FileAddress, LogMessageType.Error);
-                    break;
-                }
-                if (trade.Time < timeStart)
-                {
-                    continue;
-                }
-                else if (trade.Time > timeEnd)
-                {
-                    break;
-                }
-                trades.Add(trade);
-            }
-
-            if (trades.Count == 0)
-            {
-                SendLogMessage(OsLocalization.Market.Message34 + timeStart.ToShortDateString() +
-                               OsLocalization.Market.Message33 + timeEnd.ToShortDateString() + OsLocalization.Market.Message14 + security.Name, LogMessageType.Error);
-            }
-
-            DataStorage storage = new DataStorage();
-            storage.Trades = trades;
-            storage.Security = security;
-            storage.TimeEnd = timeEnd;
-            storage.TimeStart = timeStart;
-            storage.StorageType = TesterDataType.TickOnlyReadyCandle;
-
-            return storage;
+            return null;
         }
 
         private DataStorage LoadMarketDepthFromFolder(Security security, DateTime timeStart, DateTime timeEnd)
         {
-            SecurityTester sec = SecuritiesTester.Find(s => s.Security.Name == security.Name && s.DataType == SecurityTesterDataType.Tick);
-
-            if (sec == null)
+            try
             {
-                return null;
+
+                SecurityTester sec = SecuritiesTester.Find(s => s.Security.Name == security.Name && s.DataType == SecurityTesterDataType.Tick);
+
+                if (sec == null)
+                {
+                    return null;
+                }
+
+                StreamReader reader = new StreamReader(sec.FileAddress);
+                List<MarketDepth> marketDepths = new List<MarketDepth>();
+
+                while (!reader.EndOfStream)
+                {
+                    MarketDepth depth = new MarketDepth();
+                    try
+                    {
+                        depth.SetMarketDepthFromString(reader.ReadLine());
+                        depth.SecurityNameCode = sec.Security.Name;
+                    }
+                    catch
+                    {
+                        SendLogMessage(OsLocalization.Market.Message31 + sec.FileAddress, LogMessageType.Error);
+                        break;
+                    }
+                    if (depth.Time < timeStart)
+                    {
+                        continue;
+                    }
+                    else if (depth.Time > timeEnd)
+                    {
+                        break;
+                    }
+                    marketDepths.Add(depth);
+                }
+
+                if (marketDepths.Count == 0)
+                {
+                    SendLogMessage(OsLocalization.Market.Message34 + timeStart.ToShortDateString() +
+                                   OsLocalization.Market.Message33 + timeEnd.ToShortDateString() + " Бумага: " + security.Name, LogMessageType.Error);
+                }
+
+                DataStorage storage = new DataStorage();
+                storage.MarketDepths = marketDepths;
+                storage.Security = security;
+                storage.TimeEnd = timeEnd;
+                storage.TimeStart = timeStart;
+                storage.StorageType = TesterDataType.MarketDepthOnlyReadyCandle;
+
+                return storage;
             }
-
-            StreamReader reader = new StreamReader(sec.FileAddress);
-            List<MarketDepth> marketDepths = new List<MarketDepth>();
-
-            while (!reader.EndOfStream)
+            catch (Exception ex)
             {
-                MarketDepth depth = new MarketDepth();
-                try
-                {
-                    depth.SetMarketDepthFromString(reader.ReadLine());
-                    depth.SecurityNameCode = sec.Security.Name;
-                }
-                catch
-                {
-                    SendLogMessage(OsLocalization.Market.Message31 + sec.FileAddress, LogMessageType.Error);
-                    break;
-                }
-                if (depth.Time < timeStart)
-                {
-                    continue;
-                }
-                else if (depth.Time > timeEnd)
-                {
-                    break;
-                }
-                marketDepths.Add(depth);
+                SendLogMessage(ex.ToString(), LogMessageType.Error);
             }
-
-            if (marketDepths.Count == 0)
-            {
-                SendLogMessage(OsLocalization.Market.Message34 + timeStart.ToShortDateString() +
-                               OsLocalization.Market.Message33 + timeEnd.ToShortDateString() + " Бумага: " + security.Name, LogMessageType.Error);
-            }
-
-            DataStorage storage = new DataStorage();
-            storage.MarketDepths = marketDepths;
-            storage.Security = security;
-            storage.TimeEnd = timeEnd;
-            storage.TimeStart = timeStart;
-            storage.StorageType = TesterDataType.MarketDepthOnlyReadyCandle;
-
-            return storage;
+            return null;
         }
 
         #endregion

@@ -237,6 +237,8 @@ namespace OsEngine.Market.Servers.QuikLua
         /// </summary>
         public event Action DisconnectEvent;
 
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
+
         #endregion
 
         #region 2 Properties
@@ -453,18 +455,20 @@ namespace OsEngine.Market.Servers.QuikLua
                 if (oneSec.ClassCode == "SPBFUT")
                 {
                     newSec.SecurityType = SecurityType.Futures;
+                    newSec.UsePriceStepCostToCalculateVolume = true;
                     string exp = oneSec.MatDate;
                     newSec.Expiration = new DateTime(Convert.ToInt32(exp.Substring(0, 4))
                         , Convert.ToInt32(exp.Substring(4, 2))
                         , Convert.ToInt32(exp.Substring(6, 2)));
 
-                    newSec.Go = QuikLua.Trading
+                    newSec.MarginBuy = QuikLua.Trading
                         .GetParamEx(classCode, secCode, "SELLDEPO")
                         .Result.ParamValue.Replace('.', Separator).ToDecimal();
                 }
                 else if (oneSec.ClassCode == "SPBOPT")
                 {
                     newSec.SecurityType = SecurityType.Option;
+                    newSec.UsePriceStepCostToCalculateVolume = true;
 
                     newSec.OptionType = QuikLua.Trading.GetParamEx(classCode, secCode, "OPTIONTYPE")
                         .Result.ParamImage == "Put"
@@ -476,7 +480,7 @@ namespace OsEngine.Market.Servers.QuikLua
                         , Convert.ToInt32(exp.Substring(4, 2))
                         , Convert.ToInt32(exp.Substring(6, 2)));
 
-                    newSec.Go = QuikLua.Trading
+                    newSec.MarginBuy = QuikLua.Trading
                         .GetParamEx(classCode, secCode, "SELLDEPO")
                         .Result.ParamValue.Replace('.', Separator).ToDecimal();
 

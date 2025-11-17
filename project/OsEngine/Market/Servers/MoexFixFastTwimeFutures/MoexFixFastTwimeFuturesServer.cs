@@ -607,7 +607,10 @@ namespace OsEngine.Market.Servers.MoexFixFastTwimeFutures
         public List<IServerParameter> ServerParameters { get; set; }
 
         public event Action ConnectEvent;
+
         public event Action DisconnectEvent;
+
+        public event Action ForceCheckOrdersAfterReconnectEvent { add { } remove { } }
 
         #endregion
 
@@ -1459,7 +1462,7 @@ namespace OsEngine.Market.Servers.MoexFixFastTwimeFutures
                                 newSecurity.DecimalsVolume = 1;
                                 newSecurity.Decimals = int.Parse(secDecimals);
                                 newSecurity.Decimals = GetDecimals(newSecurity.PriceStep);
-                                newSecurity.Go = msg.GetString("InitialMarginOnBuy").ToDecimal();
+                                newSecurity.MarginBuy = msg.GetString("InitialMarginOnBuy").ToDecimal();
                                 newSecurity.PriceLimitLow = msg.GetString("LowLimitPx").ToDecimal();
                                 newSecurity.PriceLimitHigh = msg.GetString("HighLimitPx").ToDecimal();
 

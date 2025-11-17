@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
+﻿using System.Collections.Generic;
 
 namespace OsEngine.Market.Servers.XT.XTFutures.Entity
 {
@@ -129,6 +124,7 @@ namespace OsEngine.Market.Servers.XT.XTFutures.Entity
         public string notProfit { get; set; }       // Unrealized PnL
         public string bonus { get; set; }           // Bonus / trial funds
         public string coupon { get; set; }          // Coupon deduction
+        public string marginBalance { get; set; }
     }
 
     public class XTFuturesPosition

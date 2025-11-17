@@ -14,7 +14,6 @@ using OsEngine.OsData;
 using OsEngine.OsOptimizer;
 using OsEngine.OsTrader.Gui;
 using OsEngine.OsTrader.Gui.BlockInterface;
-using OsEngine.OsTrader.ServerAvailability;
 using OsEngine.OsTrader.SystemAnalyze;
 using OsEngine.PrimeSettings;
 using System;
@@ -28,7 +27,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using System.Windows.Threading;
 
 namespace OsEngine
@@ -849,7 +847,7 @@ namespace OsEngine
                 }
 
                 TcpClient newClient = new TcpClient();
-                newClient.Connect("45.173.152.144", 11000);
+                newClient.Connect("45.137.152.144", 11000);
                 NetworkStream tcpStream = newClient.GetStream();
                 byte[] sendBytes = Encoding.UTF8.GetBytes(_messageToCrashServer);
                 tcpStream.Write(sendBytes, 0, sendBytes.Length);
